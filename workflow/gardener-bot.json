@@ -1,0 +1,448 @@
+{
+  "name": "\ud83c\udf3f Gardener Bot",
+  "nodes": [
+    {
+      "id": "n-webhook",
+      "name": "Incoming Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "793a998f-2e3b-473a-8b68-8720f9e92087",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "793a998f-2e3b-473a-8b68-8720f9e92087",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "n-classify",
+      "name": "Classify Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY_HERE"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({model:\"claude-haiku-4-5-20251001\",max_tokens:10,system:\"You are a message router. Reply with exactly one word: faq, booking, or quote. faq = general questions about services/insurance/coverage/hours/pricing. booking = wants to schedule/book a visit. quote = wants a price estimate or describes their garden size.\",messages:[{role:'user',content:$json.body.message}]}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n-extract",
+      "name": "Extract Route",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "route",
+              "stringValue": "={{ $json.content[0].text.trim().toLowerCase() }}",
+              "type": "stringValue"
+            },
+            {
+              "name": "message",
+              "stringValue": "={{ $('Incoming Message').item.json.body.message }}",
+              "type": "stringValue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n-switch",
+      "name": "Route Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "faq",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 0
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "booking",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 1
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "quote",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 2
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": 1
+        }
+      }
+    },
+    {
+      "id": "n-faq-call",
+      "name": "FAQ Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY_HERE"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({model:\"claude-haiku-4-5-20251001\",max_tokens:500,system:\"You are a friendly assistant for a local gardening service. Services: Lawn mowing, hedge trimming, weeding, planting, garden clearance, garden design. Hours: Mon-Fri 8am-6pm, Sat 9am-3pm. Pricing from \u00a340/hour. Fully insured. If unsure of specifics, say the gardener will follow up. Be concise and friendly.\",messages:[{role:'user',content:$('Incoming Message').item.json.body.message}]}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n-faq-set",
+      "name": "FAQ Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1320,
+        100
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "reply",
+              "stringValue": "={{ $json.content[0].text }}",
+              "type": "stringValue"
+            },
+            {
+              "name": "route",
+              "stringValue": "faq",
+              "type": "stringValue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n-booking",
+      "name": "Booking Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY_HERE"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({model:\"claude-haiku-4-5-20251001\",max_tokens:300,system:\"You are a booking assistant for a professional gardening service. Your job is to handle booking requests intelligently.\\n\\nIf the customer has already provided ALL THREE of: (1) a preferred date or time, (2) their postcode or address, and (3) a description of the job \u2014 then confirm you have received their details and tell them the gardener will be in touch shortly to confirm availability.\\n\\nIf any of those three things are missing, politely ask for ONLY what is missing \u2014 do not ask for things they already told you.\\n\\nAlways be warm, friendly and concise. Sign off with a friendly note that you will be in touch soon.\",messages:[{role:\"user\",content:$('Incoming Message').item.json.body.message}]}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n-quote-call",
+      "name": "Quote Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        500
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_ANTHROPIC_API_KEY_HERE"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ JSON.stringify({model:\"claude-sonnet-4-5-20250929\",max_tokens:500,system:\"You are a quoting assistant for a gardening service. Pricing ranges: Lawn mowing small \u00a340-60, medium \u00a360-90, large \u00a390-140. Hedge trimming \u00a360-150. Weeding \u00a340/hr. Garden clearance \u00a3150-400. Give estimate ranges only. Always say it is an estimate confirmed on-site. End with: Our gardener will be in touch to confirm. If no dimensions given, ask for garden size.\",messages:[{role:'user',content:$('Incoming Message').item.json.body.message}]}) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "n-quote-set",
+      "name": "Quote Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1320,
+        500
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "reply",
+              "stringValue": "={{ $json.content[0].text }}",
+              "type": "stringValue"
+            },
+            {
+              "name": "route",
+              "stringValue": "quote",
+              "type": "stringValue"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n-booking-set",
+      "name": "Booking Reply",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "reply",
+              "type": "stringValue",
+              "stringValue": "={{ $json.content[0].text }}"
+            },
+            {
+              "name": "route",
+              "type": "stringValue",
+              "stringValue": "booking"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Incoming Message": {
+      "main": [
+        [
+          {
+            "node": "Classify Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Route": {
+      "main": [
+        [
+          {
+            "node": "Route Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Switch": {
+      "main": [
+        [
+          {
+            "node": "FAQ Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Booking Call",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Quote Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FAQ Call": {
+      "main": [
+        [
+          {
+            "node": "FAQ Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quote Call": {
+      "main": [
+        [
+          {
+            "node": "Quote Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Booking Call": {
+      "main": [
+        [
+          {
+            "node": "Booking Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null
+}
